@@ -1,0 +1,118 @@
+---
+title: "Cars Segmentation using Kmeans Clustering "
+author: "Divaynshu Goswami"
+date: "March 11, 2019"
+output: html_document
+---
+
+                                    Problem
+We have a data of cars produced from 1970 - 1980 with different specifications. We have to form clusters to identify different segment of cars.
+
+
+                                    Solution
+We can provide a solution by clustering/segmenting customers and indentifying their profile. We will perform non-hierarchical K-means clustering.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#install required packages
+
+```{r}
+
+#install.packages('cluster')
+#install.packages('fpc')
+#install.packages('NbClust')
+library(cluster)
+library(fpc)
+library(NbClust)
+```
+
+
+#Extract data and check for missing values
+```{r extract DATA}
+
+mydata <- read.csv(file.choose())
+
+#Missing value handeling
+#Replace missing values in Cubiccentimetre and Weight with mean values
+mydata_na <- mydata[rowSums(is.na(mydata)) > 0,]
+mydata[is.na(mydata[,3]), 3] <- mean(mydata[,3], na.rm = TRUE)
+mydata[is.na(mydata[,5]), 5] <- mean(mydata[,5], na.rm = TRUE)
+
+
+
+```
+
+
+#Scale the data
+```{r Scaling}
+mydata_scld <- scale(mydata[,1:6])
+
+#set seed
+
+set.seed(1234)
+
+```
+
+
+#Create WSS Plot to identify optimal no. of clusters
+```{r WSS, echo=FALSE}
+
+#Create a wss function
+wssplot <- function(data, nc=15, seed=1234){
+  wss <- (nrow(data)-1)*sum(apply(data,2,var))
+  for (i in 2:nc){
+    set.seed(seed)
+    wss[i] <- sum(kmeans(data, centers=i)$withinss)}
+  plot(1:nc, wss, type="b", xlab="Number of Clusters",
+       ylab="Within groups sum of squares")}
+
+# use scaled data
+wssplot(mydata_scld, nc=10)
+
+```
+
+In this WSS plot we can see that WSS decreases significatntly till 3 clusters and then there is not much decrease with more no. of clusters.
+
+
+##Performing non-hirarichical Kmeans clustering
+```{r Kmeans}
+#nstart = 10 it will do the clustering process 10 times for each observation to check consistency of the obsevation on every iteration
+clust_Km = kmeans(x=mydata_scld, centers = 3, nstart = 10)
+clust_Km
+```
+
+```{r Clusterplot }
+
+########### plotting
+
+plotcluster(mydata_scld,clust_Km$cluster)
+mydata_nw<-data.frame(mydata,clust_Km$cluster)
+clusplot(mydata_scld,clust_Km$cluster,shade = T,color = T)
+```
+
+#let's do profiling ofdifferent segment of cars
+
+```{r}
+## profiling the clusters
+mydata$ClustersK <- clust_Km$cluster
+
+aggr = aggregate(mydata[,-c(8,9)],list(mydata$ClustersK),mean)
+clust_km_profile <- data.frame( Cluster=aggr[,1],
+                            Freq=as.vector(table(mydata$ClustersK)),
+                            aggr[,-1])
+
+
+#Output
+print(clust_km_profile)
+```
+
+We can explain the above 3 clusters as following ;-
+
+Cluster 1 - This segment consist of cars with highest miles per gallon average of around 29.5 mpg but low power and light weight body. These are economy cars.
+
+Cluster 2 - This cluster consist of heavy and pwerful cars with 7 cylinders and around 161 horse power. These are the fastest to reach 100 in avg. of 12.5 seconds and with lowest Miles per gallon average of only 14.8 miles. These seems to be high end sports cars.
+
+Cluster 3 - This consist of mid range cars with decent mpg of 20 miles and 6 cylinders but low pickup. These can be the middle segment multiutility vehicle.
